@@ -48,7 +48,7 @@ async function marketTop(market, n) {
   return out;
 }
 async function sectors() {
-  const j = await get(`${M}/stocks/industry?page=1&pageSize=200`, { enc: 'utf-8', json: true });
+  const j = await get(`${M}/stocks/industry?page=1&pageSize=100`, { enc: 'utf-8', json: true });
   const groups = (j.groups || []).map((g) => ({ no: String(g.no), name: g.name }));
   const map = {}, list = [];
   await pool(groups, 4, async (g) => {

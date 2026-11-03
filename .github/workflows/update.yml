@@ -43,7 +43,7 @@ jobs:
           ls -la store.enc.json 2>/dev/null || echo "이전 자료 없음 — 처음부터 수집합니다"
 
       - name: 수집
-        if: github.event_name == 'schedule' || inputs.collect == true || !hashFiles('store.enc.json')
+        if: github.event_name != 'workflow_dispatch' || inputs.collect == true || hashFiles('store.enc.json') == ''
         run: node scripts/collect.mjs store.enc.json
 
       - name: 수집 자료 저장 (data 브랜치)
