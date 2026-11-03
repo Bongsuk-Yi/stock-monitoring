@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#008254">
+<title>수급 대시보드</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <div>
+      <div class="eyebrow">코스피200 + 코스닥 · 수급 분석</div>
+      <h1 id="title">수급 대시보드</h1>
+    </div>
+    <button type="button" class="picker" id="picker" aria-label="종목 바꾸기"><span id="pickerName">종목 선택</span> ▾</button>
+  </div>
+  <div class="stamp" id="stamp">자료를 불러오는 중…</div>
+</header>
+
+<main class="wrap" id="main">
+  <!-- 종목 요약(판단·차트·표·세력 탭 공통) -->
+  <section class="card hero" id="hero" data-tabs="judge chart table force"></section>
+
+  <!-- ───── 시장 ───── -->
+  <nav class="subnav" data-tab="market"><a href="#mk-sum">오늘 요약</a><a href="#mk-acc">주체별</a><a href="#mk-top">Top</a><a href="#mk-sec">업종</a><a href="#mk-lu">상한가</a></nav>
+  <section class="card" id="mk-sum" data-tab="market"><h2>오늘의 수급 <small id="mkDate"></small></h2><div id="mkSum"></div>
+    <p class="note">분석 종목(코스피200 + 코스닥 시가총액 상위) 안에서 순매수 수량 × 종가를 더한 값입니다. 거래소 전체 집계와 다릅니다.</p></section>
+  <section class="card" id="mk-acc" data-tab="market"><h2>주체별 누적 순매수 <small>최근 60거래일 · 억원</small></h2><div class="chart" id="mkAccChart"></div></section>
+  <section class="card" id="mk-top" data-tab="market"><h2>누가 많이 사고 팔았나 <small>분석 종목 기준</small></h2>
+    <div class="seg-row"><div class="seg" id="topPeriod"><button data-v="1" class="on">당일</button><button data-v="5">5일 누적</button><button data-v="20">20일 누적</button></div>
+      <div class="seg" id="topWho"><button data-v="s" class="on">세력합</button><button data-v="f">외국인</button><button data-v="o">기관</button></div></div>
+    <div class="two"><div><h3>순매수 상위</h3><table class="tbl" id="topBuy"></table></div><div><h3>순매도 상위</h3><table class="tbl" id="topSell"></table></div></div>
+    <p class="note">순위는 금액 크기 순일 뿐 추천이 아닙니다. 종목을 누르면 분석 화면으로 이동하고, 색 태그는 종합 판단입니다.</p></section>
+  <section class="card" id="mk-sec" data-tab="market"><h2>업종별 외국인·기관 <small>5일 누적 · 억원</small></h2>
+    <div class="two"><div><h3>순매수 상위 업종</h3><table class="tbl" id="secBuy"></table></div><div><h3>순매도 상위 업종</h3><table class="tbl" id="secSell"></table></div></div></section>
+  <section class="card" id="mk-lu" data-tab="market"><h2>오늘 상한가</h2><table class="tbl" id="mkLimit"></table><p class="note"><a href="#" data-go="streak">강한진입 탭에서 날짜별로 보기 →</a></p></section>
+
+  <!-- ───── 판단 ───── -->
+  <section class="card" id="jbasis" data-tab="judge"><h2>종합 판단 근거 — 기준선과 비교</h2>
+    <p class="note">네 가지 분석(① 수급 후보, ② 진입 확인, ③ 추세 확인, ④ 분석 보고서)이 기준선을 넘는지 보고 <b class="v-in">매수진입</b>·<b class="v-wait">매수대기</b>·<b class="v-hold">매수보류</b>·<b class="v-no">매수불가</b>로 나눕니다. 수익을 보장하지 않으며 실제 주문과 연결되어 있지 않습니다.</p>
+    <div id="basis"></div>
+    <details class="cfg"><summary>기준선 설정 — 직접 바꿀 수 있습니다 (이 브라우저에 저장)</summary><div id="cfgBox"></div></details>
+  </section>
+  <section class="card" id="checks" data-tab="judge"><h2>① 수급 후보 — 신호 3가지와 확인 2가지</h2>
+    <p class="note">신호 ①②③ 중 2개 이상이면 「강한 진입」, ①만이면 「진입」, ②나 ③만이면 「진입 준비」입니다. 후보 강도는 곧바로 매수 가능하다는 뜻이 아닙니다.</p><table class="tbl" id="sigTable"></table></section>
+  <section class="card" id="entry" data-tab="judge"><h2>② 진입 확인 — 반등·수급·가격 기준 점검</h2><table class="tbl" id="ckTable"></table>
+    <p class="note">「필수」로 표시된 조건만 판단에 쓰입니다. 기준선 설정에서 바꿀 수 있습니다.</p></section>
+  <section class="card" id="perf" data-tab="judge"><h2>이 종목의 지난 신호는 어땠나</h2><table class="tbl" id="perfTable"></table>
+    <p class="note">보관 중인 약 2년 기록이고, 이어지는 신호는 첫날만 셌습니다. 20일 뒤 수익률은 신호가 난 날 종가 기준입니다. 과거 성과가 앞으로를 보장하지 않습니다.</p></section>
+
+  <!-- ───── 강한진입 ───── -->
+  <nav class="subnav" data-tab="streak"><a href="#limitup">상한가</a><a href="#jlist">종합 판단별</a><a href="#streak">연속 신호</a></nav>
+  <section class="card" id="limitup" data-tab="streak"><h2>상한가 종목</h2><div class="seg-row"><label>날짜 <select id="luDate"></select></label></div><table class="tbl" id="luTable"></table></section>
+  <section class="card" id="jlist" data-tab="streak"><h2>종합 판단별 종목 검색</h2>
+    <p class="note">판정은 판단 탭의 「기준선 설정」을 따릅니다. 줄을 누르면 그 종목의 판단 탭으로 갑니다.</p>
+    <div class="seg-row"><div class="seg" id="jFilter"><button data-v="매수진입" class="on">매수진입</button><button data-v="매수대기">매수대기</button><button data-v="매수보류">매수보류</button><button data-v="매수불가">매수불가</button></div>
+      <label class="chk"><input type="checkbox" id="jStreak3"> 강한 진입 연속 3일 이상만</label></div>
+    <table class="tbl" id="jTable"></table></section>
+  <section class="card" id="streak" data-tab="streak"><h2>강한 진입이 5거래일 연속 나온 종목</h2>
+    <p class="note">신호 ①눌림 매수 ②매집 간격 확산 ③거래량 폭발 중 2개 이상이 켜진 「강한 진입」이 오늘까지 며칠째 이어지는지 셉니다. 과거 승률·평균은 지금 켜진 신호들이 이 종목에서 예전에 났을 때 20일 뒤 결과를 합친 값입니다. 승률 50% 미만이거나 평균 수익이 마이너스인 종목은 아래에 따로 적었습니다(표본 5건 미만은 판단하지 않음).</p>
+    <div class="seg-row"><label>날짜 <select id="stDate"></select></label></div>
+    <table class="tbl" id="st5"></table>
+    <h3>곧 5일이 되는 종목 (3~4일 연속)</h3><table class="tbl" id="st34"></table>
+    <h3>과거 성과가 나빠 제외한 종목</h3><table class="tbl" id="stBad"></table></section>
+
+  <!-- ───── 업종 ───── -->
+  <nav class="subnav" data-tab="sector"><a href="#sector">매집이평선</a><a href="#seclist">업종·구성 종목</a></nav>
+  <section class="card" id="sector" data-tab="sector"><h2>업종별 수급 — 매집이평선</h2>
+    <div class="seg-row"><div class="seg" id="secMode"><button data-v="strong" class="on">매집 강한 12개</button><button data-v="all">전체</button></div></div>
+    <div class="spark-grid" id="sparkGrid"></div>
+    <p class="note">각 차트는 최근 약 250거래일입니다. 회색은 매집수량(누적 순매수에서 누적 최저점을 뺀 값), 초록은 5일선, 주황은 20일선입니다. 금액은 세력합(외국인+기관) 순매수 수량 × 종가의 합입니다.</p></section>
+  <section class="card" id="seclist" data-tab="sector"><h2>업종 목록과 구성 종목</h2><table class="tbl" id="secTable"></table>
+    <h3 id="slTitle"></h3><table class="tbl" id="slTable"></table>
+    <p class="note">주도 순서 = 분석 중인 종목을 최근 20일 세력 순매수 금액이 큰 순으로 줄 세운 것입니다. 업종 내 비중은 순매수가 플러스인 종목끼리의 몫입니다.</p></section>
+
+  <!-- ───── 차트 ───── -->
+  <section class="card" data-tab="chart"><h2>주가와 신호 <small>최근 1년</small></h2><div class="chart tall" id="chPrice"></div>
+    <p class="note">▲ 강한 진입 시작일 · 선은 20일 이동평균</p></section>
+  <section class="card" data-tab="chart"><h2>세력합 매집수량</h2><div class="chart" id="chAcc"></div>
+    <p class="note">외국인·기관의 순매수를 모은 누적 값(최저점 기준)입니다. 5일선이 20일선 위로 올라가면 매집이 강해지는 중입니다.</p></section>
+  <section class="card" data-tab="chart"><h2>매집 간격 <small>(5일선 − 20일선) ÷ 20일 평균 거래량</small></h2><div class="chart" id="chGap"></div>
+    <p class="note">점선은 과거 양(+) 간격의 상위 25% 선(신호 ② 기준)이고, 선이 점선 위로 올라간 첫날을 ●로 표시했습니다.</p></section>
+  <section class="card" data-tab="chart"><h2>분산비 <small>세력합</small></h2><div class="chart short" id="chRatio"></div>
+    <p class="note">매집수량이 그동안의 최고치에 얼마나 가까운지입니다. 1에 가까울수록 매집이 쌓여 있습니다.</p></section>
+
+  <!-- ───── 표 ───── -->
+  <section class="card" data-tab="table"><h2>기간별 거래량과 수급주체별 순매수</h2>
+    <p class="note">오늘부터 거꾸로 센 구간별 표입니다. 주는 5일, 월은 20일, 분기는 60일, 년은 240일 단위입니다.</p>
+    <div class="seg-row"><div class="seg" id="tUnit"><button data-v="5">주</button><button data-v="20" class="on">월</button><button data-v="60">분기</button><button data-v="240">년</button></div>
+      <div class="seg" id="tMode"><button data-v="q" class="on">순매수량</button><button data-v="p">매수 평균단가</button></div></div>
+    <div class="tw"><table class="tbl num" id="periodTable"></table></div>
+    <h3>수급주체별 현재 매수평단</h3><table class="tbl num" id="costTable"></table>
+    <p class="note">순매수한 날의 종가로 원가를 쌓고, 순매도한 날은 보유 수량 비율만큼 덜어 계산한 평균 매수가입니다. 수익률은 오늘 종가 기준입니다.</p></section>
+
+  <!-- ───── 세력 ───── -->
+  <section class="card" data-tab="force"><h2>상승하기 전에 누가 매집했나</h2><div id="whoBox"></div></section>
+  <section class="card" data-tab="force"><h2>지금 그 세력은 어떤가</h2><p class="note">주체별 최근 60일 누적 순매수입니다. 오르는 선은 계속 사고 있다는 뜻입니다.</p>
+    <div class="chart" id="chForce"></div><table class="tbl num" id="forceTable"></table></section>
+
+  <!-- ───── 목록 ───── -->
+  <section class="card" id="find" data-tab="list"><h2>종목 검색</h2>
+    <div class="seg-row"><input id="q" placeholder="종목명 또는 코드" autocomplete="off"><select id="qMarket"><option value="">시장 전체</option><option>KOSPI</option><option>KOSDAQ</option></select><select id="qSector"><option value="">업종 전체</option></select></div>
+    <table class="tbl" id="qTable"></table></section>
+  <section class="card" id="rank" data-tab="list"><h2>종목 모아보기</h2><p class="note">줄을 누르면 그 종목 분석으로 바뀝니다. 진입 신호가 있는 종목이 위에 옵니다.</p><table class="tbl" id="rankTable"></table></section>
+
+  <!-- ───── 모의투자 ───── -->
+  <section class="card" data-tab="sim"><h2>내 모의투자 현황</h2><div id="simSum"></div><table class="tbl num" id="simPos"></table>
+    <h3>지난 거래</h3><table class="tbl num" id="simHist"></table></section>
+  <section class="card" data-tab="sim"><h2>진행 규칙</h2><div id="simRule"></div></section>
+  <section class="card" data-tab="sim"><h2>종합 판단 후보 종목 <small>매수진입</small></h2><table class="tbl" id="simCand"></table></section>
+
+  <p class="foot">자료: 네이버 증권 공개 페이지(일별 시세·외국인/기관 순매매) · 매일 장 마감 뒤 자동 갱신 · 세력합 = 외국인 + 기관계 · 참고 지표이며 투자 권유가 아닙니다.</p>
+</main>
+
+<div class="sheet" id="sheet" hidden><div class="sheet-box"><div class="sheet-head"><input id="sheetQ" placeholder="종목명 또는 코드로 찾기" autocomplete="off"><button type="button" id="sheetClose">닫기</button></div><div id="sheetList"></div></div></div>
+
+<nav class="tabbar" id="tabbar" aria-label="구역 이동">
+  <button type="button" data-go="market"><b>◎</b><span>시장</span></button>
+  <button type="button" data-go="judge"><b>◆</b><span>판단</span></button>
+  <button type="button" data-go="streak"><b>▲</b><span>강한진입</span></button>
+  <button type="button" data-go="sector"><b>▦</b><span>업종</span></button>
+  <button type="button" data-go="chart"><b>〽</b><span>차트</span></button>
+  <button type="button" data-go="table"><b>▤</b><span>표</span></button>
+  <button type="button" data-go="force"><b>◉</b><span>세력</span></button>
+  <button type="button" data-go="list"><b>☰</b><span>목록</span></button>
+  <button type="button" data-go="sim"><b>₩</b><span>모의</span></button>
+</nav>
+<div class="toast" id="toast" hidden></div>
+
+<script src="vendor/lightweight-charts.js"></script>
+<script src="js/engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
