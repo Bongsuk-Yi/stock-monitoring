@@ -1,5 +1,5 @@
 // 수급 자료 수집 (GitHub Actions에서 평일 장 마감 뒤 실행)
-// 출처: 네이버 증권 공개 페이지 — 코스피200 구성종목, 코스닥 시가총액 상위, 업종 분류, 종목별 일별 시세·외국인/기관 순매매
+// 출처: 네이버 증권 모바일 API(시가총액 순위·업종·외국인/기관 순매수)와 차트 API(일봉)
 // 누적 자료는 암호화한 store.enc.json(별도 data 브랜치)에 보관한다. 사용법: SITE_PASSWORD=... node scripts/collect.mjs [store경로]
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { encrypt, decryptNode } from './gate.mjs';
@@ -7,13 +7,12 @@ import { encrypt, decryptNode } from './gate.mjs';
 const STORE = process.argv[2] || 'store.enc.json';
 const PW = process.env.SITE_PASSWORD;
 if (!PW) { console.error('SITE_PASSWORD 가 필요합니다'); process.exit(1); }
+const KOSPI_N = +(process.env.KOSPI_N || 200);
 const KOSDAQ_N = +(process.env.KOSDAQ_N || 150);
 const KEEP = 520;                  // 보관 거래일 수(약 2년)
-const FULL_PAGES = 26;             // 처음 받는 종목: 외국인/기관 20일×26쪽
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const num = (s) => { if (s == null) return null; const t = String(s).replace(/[,\s%+]/g, ''); if (t === '' || t === '-') return null; const n = Number(t); return isFinite(n) ? n : null; };
-const strip = (h) => h.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
 let reqs = 0, fails = 0;
 async function get(url, { enc = 'euc-kr', json = false } = {}) {
@@ -33,37 +32,37 @@ async function pool(items, n, fn) {
   await Promise.all(Array.from({ length: n }, async () => { while (k < items.length) { const i = k++; try { out[i] = await fn(items[i], i); } catch (e) { out[i] = { error: e.message }; } await sleep(120); } }));
   return out;
 }
-const codeLinks = (html) => [...html.matchAll(/\/item\/main\.naver\?code=(\d{6})"[^>]*>([^<]+)</g)].map((m) => ({ code: m[1], name: m[2].trim() }));
 
-/* ── 대상 종목 ── */
-async function kospi200() {
-  const out = new Map();
-  for (let p = 1; p <= 25; p++) {
-    const list = codeLinks(await get(`https://finance.naver.com/sise/entryJongmok.naver?type=KPI200&page=${p}`));
-    if (!list.length) break;
-    list.forEach((x) => out.set(x.code, x.name));
-  }
-  return out;
-}
-async function kosdaqTop(n) {
+/* ── 대상 종목 ── (네이버 증권 모바일 API)
+   코스피200 구성종목 목록은 공개 주소가 없어져, 코스피 시가총액 상위 보통주 200개로 대신한다. */
+const M = 'https://m.stock.naver.com/api';
+const isCommon = (x) => x.stockEndType === 'stock' && /^\d{5}0$/.test(x.itemCode);
+async function marketTop(market, n) {
   const out = new Map();
   for (let p = 1; out.size < n && p <= 10; p++) {
-    const list = codeLinks(await get(`https://finance.naver.com/sise/sise_market_sum.naver?sosok=1&page=${p}`));
-    if (!list.length) break;
-    for (const x of list) { if (out.size >= n) break; out.set(x.code, x.name); }
+    const j = await get(`${M}/stocks/marketValue/${market}?page=${p}&pageSize=100`, { enc: 'utf-8', json: true });
+    const list = (j.stocks || []).filter(isCommon);
+    if (!(j.stocks || []).length) break;
+    for (const x of list) { if (out.size >= n) break; out.set(x.itemCode, x.stockName); }
   }
   return out;
 }
 async function sectors() {
-  const html = await get('https://finance.naver.com/sise/sise_group.naver?type=upjong');
-  const groups = [...html.matchAll(/sise_group_detail\.naver\?type=upjong&(?:amp;)?no=(\d+)"[^>]*>([^<]+)</g)].map((m) => ({ no: m[1], name: m[2].trim() }));
+  const j = await get(`${M}/stocks/industry?page=1&pageSize=200`, { enc: 'utf-8', json: true });
+  const groups = (j.groups || []).map((g) => ({ no: String(g.no), name: g.name }));
   const map = {}, list = [];
   await pool(groups, 4, async (g) => {
-    const members = codeLinks(await get(`https://finance.naver.com/sise/sise_group_detail.naver?type=upjong&no=${g.no}`));
-    list.push({ no: g.no, name: g.name, members: members.map((m) => m.code), names: Object.fromEntries(members.map((m) => [m.code, m.name])) });
-    members.forEach((m) => { map[m.code] = g.name; });
+    const members = [];
+    for (let p = 1; p <= 10; p++) {
+      const r = await get(`${M}/stocks/industry/${g.no}?page=${p}&pageSize=100`, { enc: 'utf-8', json: true });
+      const st = r.stocks || [];
+      members.push(...st.filter((x) => (x.sosok === '0' || x.sosok === '1') && isCommon(x)));
+      if (st.length < 100) break;
+    }
+    list.push({ no: g.no, name: g.name, members: members.map((m) => m.itemCode), names: Object.fromEntries(members.map((m) => [m.itemCode, m.stockName])) });
+    members.forEach((m) => { map[m.itemCode] = g.name; });
   });
-  return { map, list: list.sort((a, b) => a.name.localeCompare(b.name, 'ko')) };
+  return { map, list: list.filter((g) => g.members.length).sort((a, b) => a.name.localeCompare(b.name, 'ko')) };
 }
 
 /* ── 종목별 일봉(OHLCV) ── */
@@ -76,34 +75,19 @@ async function ohlcv(code, count) {
   }
   return rows;
 }
-/* ── 종목별 외국인·기관 순매매(수량) ── */
-function parseFrgn(html) {
-  const rows = {};
-  for (const tr of html.split(/<tr[\s>]/i).slice(1)) {
-    const tds = [...tr.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map((m) => strip(m[1]));
-    if (tds.length < 7 || !/^\d{4}\.\d{2}\.\d{2}$/.test(tds[0])) continue;
-    const d = tds[0].replace(/\./g, '');
-    // 날짜 · 종가 · 전일비 · 등락률 · 거래량 · 기관 순매매량 · 외국인 순매매량 · 보유주수 · 보유율
-    rows[d] = { c: num(tds[1]), v: num(tds[4]), org: num(tds[5]), frg: num(tds[6]) };
-  }
-  return rows;
-}
-async function investorsFrgn(code, pages) {
-  const out = {};
-  for (let p = 1; p <= pages; p++) {
-    const rows = parseFrgn(await get(`https://finance.naver.com/item/frgn.naver?code=${code}&page=${p}`));
-    const ks = Object.keys(rows); if (!ks.length) break;
-    let fresh = 0; for (const k of ks) if (!out[k]) { out[k] = rows[k]; fresh++; }
-    if (!fresh) break;
-  }
-  return out;
-}
-async function investorsMobile(code) {          // 예비 경로(모바일 API)
-  const arr = await get(`https://m.stock.naver.com/api/stock/${code}/trend?pageSize=60`, { enc: 'utf-8', json: true });
-  const out = {};
-  for (const x of arr || []) {
-    const d = String(x.bizdate || '').replace(/\D/g, ''); if (d.length !== 8) continue;
-    out[d] = { c: num(x.closePrice), v: num(x.accumulatedTradingVolume), org: num(x.organPureBuyQuant), frg: num(x.foreignerPureBuyQuant) };
+/* ── 종목별 외국인·기관 순매수(수량): bizdate 를 커서로 과거로 넘긴다 ── */
+async function investors(code, days) {
+  const out = {}; let cursor = '';
+  for (let k = 0; k < 20 && Object.keys(out).length < days; k++) {
+    const arr = await get(`${M}/stock/${code}/trend?pageSize=60${cursor ? '&bizdate=' + cursor : ''}`, { enc: 'utf-8', json: true });
+    if (!Array.isArray(arr) || !arr.length) break;
+    let fresh = 0;
+    for (const x of arr) {
+      const d = String(x.bizdate || '').replace(/\D/g, ''); if (d.length !== 8 || out[d]) continue;
+      out[d] = { c: num(x.closePrice), v: num(x.accumulatedTradingVolume), org: num(x.organPureBuyQuant), frg: num(x.foreignerPureBuyQuant) }; fresh++;
+    }
+    if (!fresh || arr.length < 60) break;
+    cursor = String(arr.at(-1).bizdate).replace(/\D/g, '');
   }
   return out;
 }
@@ -124,9 +108,9 @@ function fromRows(rows) {
 (async () => {
   const t0 = Date.now(), store = loadStore();
   console.log(`기존 자료: ${Object.keys(store.stocks).length}종목`);
-  const [k2, kq] = await Promise.all([kospi200(), kosdaqTop(KOSDAQ_N)]);
-  console.log(`코스피200 ${k2.size} · 코스닥 상위 ${kq.size}`);
-  if (k2.size < 150) throw new Error('코스피200 목록을 충분히 받지 못했습니다');
+  const [k2, kq] = await Promise.all([marketTop('KOSPI', KOSPI_N), marketTop('KOSDAQ', KOSDAQ_N)]);
+  console.log(`코스피 상위 ${k2.size} · 코스닥 상위 ${kq.size}`);
+  if (k2.size < 100) throw new Error('코스피 종목 목록을 충분히 받지 못했습니다');
   let sec = store.sectors;
   try { sec = await sectors(); console.log(`업종 ${sec.list.length}개`); } catch (e) { console.warn('업종 목록 실패, 이전 자료 사용:', e.message); }
   const uni = [...[...k2].map(([code, name]) => ({ code, name, market: 'KOSPI' })), ...[...kq].map(([code, name]) => ({ code, name, market: 'KOSDAQ' }))];
@@ -137,8 +121,7 @@ function fromRows(rows) {
     const rows = toRows(old);
     let px = {}; try { px = await ohlcv(u.code, fresh ? KEEP : 40); } catch (e) { /* 아래 투자자 자료의 종가로 대신 */ }
     let inv = {};
-    try { inv = await investorsFrgn(u.code, fresh ? FULL_PAGES : 2); } catch (e) {}
-    if (Object.keys(inv).length < 5) { try { inv = { ...inv, ...(await investorsMobile(u.code)) }; } catch (e) {} }
+    try { inv = await investors(u.code, fresh ? KEEP : 40); } catch (e) {}
     if (probe && Object.keys(inv).length) { probe = false; const k = Object.keys(inv).sort().at(-1); console.log('표본', u.code, k, JSON.stringify(inv[k]), JSON.stringify(px[k] || {})); }
     for (const [d, p] of Object.entries(px)) rows[d] = { ...(rows[d] || {}), ...p };
     for (const [d, x] of Object.entries(inv)) {

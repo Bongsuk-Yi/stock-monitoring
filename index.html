@@ -17,7 +17,7 @@
 <header class="top">
   <div class="top-in">
     <div>
-      <div class="eyebrow">코스피200 + 코스닥 · 수급 분석</div>
+      <div class="eyebrow">코스피·코스닥 시가총액 상위 · 수급 분석</div>
       <h1 id="title">수급 대시보드</h1>
     </div>
     <button type="button" class="picker" id="picker" aria-label="종목 바꾸기"><span id="pickerName">종목 선택</span> ▾</button>
@@ -32,7 +32,7 @@
   <!-- ───── 시장 ───── -->
   <nav class="subnav" data-tab="market"><a href="#mk-sum">오늘 요약</a><a href="#mk-acc">주체별</a><a href="#mk-top">Top</a><a href="#mk-sec">업종</a><a href="#mk-lu">상한가</a></nav>
   <section class="card" id="mk-sum" data-tab="market"><h2>오늘의 수급 <small id="mkDate"></small></h2><div id="mkSum"></div>
-    <p class="note">분석 종목(코스피200 + 코스닥 시가총액 상위) 안에서 순매수 수량 × 종가를 더한 값입니다. 거래소 전체 집계와 다릅니다.</p></section>
+    <p class="note">분석 종목(코스피 시가총액 상위 200 + 코스닥 상위 150) 안에서 순매수 수량 × 종가를 더한 값입니다. 거래소 전체 집계와 다릅니다.</p></section>
   <section class="card" id="mk-acc" data-tab="market"><h2>주체별 누적 순매수 <small>최근 60거래일 · 억원</small></h2><div class="chart" id="mkAccChart"></div></section>
   <section class="card" id="mk-top" data-tab="market"><h2>누가 많이 사고 팔았나 <small>분석 종목 기준</small></h2>
     <div class="seg-row"><div class="seg" id="topPeriod"><button data-v="1" class="on">당일</button><button data-v="5">5일 누적</button><button data-v="20">20일 누적</button></div>
@@ -117,7 +117,7 @@
   <section class="card" data-tab="sim"><h2>진행 규칙</h2><div id="simRule"></div></section>
   <section class="card" data-tab="sim"><h2>종합 판단 후보 종목 <small>매수진입</small></h2><table class="tbl" id="simCand"></table></section>
 
-  <p class="foot">자료: 네이버 증권 공개 페이지(일별 시세·외국인/기관 순매매) · 매일 장 마감 뒤 자동 갱신 · 세력합 = 외국인 + 기관계 · 참고 지표이며 투자 권유가 아닙니다.</p>
+  <p class="foot">자료: 네이버 증권(일별 시세·외국인/기관 순매수) · 매일 장 마감 뒤 자동 갱신 · 세력합 = 외국인 + 기관계 · 참고 지표이며 투자 권유가 아닙니다.</p>
 </main>
 
 <div class="sheet" id="sheet" hidden><div class="sheet-box"><div class="sheet-head"><input id="sheetQ" placeholder="종목명 또는 코드로 찾기" autocomplete="off"><button type="button" id="sheetClose">닫기</button></div><div id="sheetList"></div></div></div>
