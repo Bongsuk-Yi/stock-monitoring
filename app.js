@@ -1,4 +1,4 @@
-/* 수급 대시보드 — 화면 */
+/* 수급분석 모니터링 — 화면 */
 (() => {
 'use strict';
 const E = window.Engine, LW = window.LightweightCharts;

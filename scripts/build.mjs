@@ -72,7 +72,7 @@ writeFileSync(join(dist, 'data', 'key.json'), JSON.stringify({ salt: K.salt.toSt
 /* ── HTML 암호화 ── */
 const ver = Date.now().toString(36);
 let html = readFileSync(join(dist, 'index.html'), 'utf8').replace(/(href|src)="(styles\.css|app\.js|js\/engine\.js)"/g, `$1="$2?v=${ver}"`).replace(/<\/body>/i, LOCK_SNIPPET(STORE_KEY) + '\n</body>');
-writeFileSync(join(dist, 'index.html'), gatePage({ title: '수급 대시보드', mark: '📊', storeKey: STORE_KEY, envelope: encrypt(html, pw), theme: 'light' }));
+writeFileSync(join(dist, 'index.html'), gatePage({ title: '수급분석 모니터링', mark: '📊', storeKey: STORE_KEY, envelope: encrypt(html, pw), theme: 'light' }));
 writeFileSync(join(dist, '.nojekyll'), '');
 const size = (p) => (statSync(p).isDirectory() ? readdirSync(p).reduce((s, f) => s + size(join(p, f)), 0) : statSync(p).size);
 console.log(`빌드 완료: 기준일 ${lastDate || '-'}, 종목 ${rows.length}, 업종 ${secList.length}, dist ${(size(dist) / 1048576).toFixed(1)}MB`);
