@@ -1,5 +1,5 @@
 {
-  "name": "supply-dash",
+  "name": "stock-monitoring",
   "version": "1.0.0",
   "private": true,
   "description": "코스피·코스닥 수급분석 모니터링 (GitHub Pages + Actions)",
