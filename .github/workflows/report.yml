@@ -21,26 +21,14 @@ concurrency:
   group: ai-report
   cancel-in-progress: false
 
-env:
-  PRISM_REPO: dragon1086/prism-insight
-  PRISM_REF: a426de8e1f6d06c1bef2f57255a672ec11337303   # 검증한 원본 버전(바꾸면 새 버전 사용)
-
 jobs:
   report:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     env:
       SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
-      KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
-      KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
-      KIS_ACCOUNT: ${{ secrets.KIS_ACCOUNT }}
-      KIS_HTS_ID: ${{ secrets.KIS_HTS_ID }}
-      PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
-      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
-      FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
-      REPORT_MODEL: ${{ vars.REPORT_MODEL }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL }}
     steps:
       - uses: actions/checkout@v5
 
@@ -59,48 +47,60 @@ jobs:
           echo "market=$market" >> "$GITHUB_OUTPUT"; echo "code=$code" >> "$GITHUB_OUTPUT"; echo "name=$name" >> "$GITHUB_OUTPUT"
           echo "### $name ($code · $market) 리포트 생성" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: PRISM-INSIGHT 받기
-        uses: actions/checkout@v5
-        with:
-          repository: ${{ env.PRISM_REPO }}
-          ref: ${{ env.PRISM_REF }}
-          path: prism
+      - name: 자료 수집 (네이버 증권 / Yahoo)
+        run: python3 scripts/report/collect_data.py --market "${{ steps.t.outputs.market }}" --code "${{ steps.t.outputs.code }}" --name "${{ steps.t.outputs.name }}" --out work/data
 
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: prism/requirements.txt
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - uses: astral-sh/setup-uv@v6
 
-      - name: 의존성 설치
-        working-directory: prism
+      - name: Claude 로 리포트 작성 (5~15분)
+        working-directory: work
+        env:
+          NAME: ${{ steps.t.outputs.name }}
+          CODE: ${{ steps.t.outputs.code }}
+          MARKET: ${{ steps.t.outputs.market }}
+          LANG_IN: ${{ inputs.language }}
         run: |
-          pip install -q -r requirements.txt
-          python -m playwright install --with-deps chromium
-
-      - name: Gemini 연결 (LiteLLM 프록시)
-        run: |
-          uv tool install -q 'litellm[proxy]'
-          cd prism && python ../scripts/report/gemini_proxy.py
-
-      - name: 설정 파일 만들기
-        working-directory: prism
-        run: |
-          pip install -q pyyaml
-          python ../scripts/report/configure.py ${{ steps.t.outputs.market }}
-
-      - name: AI 분석 (5~15분)
-        working-directory: prism
-        run: python ../scripts/report/run_report.py --market "${{ steps.t.outputs.market }}" --code "${{ steps.t.outputs.code }}" --name "${{ steps.t.outputs.name }}" --lang "${{ inputs.language }}" --out ../out
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::error::GitHub Secret CLAUDE_CODE_OAUTH_TOKEN 이 없습니다 — PC에서 'claude setup-token' 으로 만든 토큰을 등록하세요."; exit 1; fi
+          npm i -g @anthropic-ai/claude-code >/dev/null 2>&1
+          mkdir -p out
+          lang=$([ "$LANG_IN" = en ] && echo "English" || echo "한국어")
+          python3 - "$lang" <<'PY'
+          import os, sys, datetime, zoneinfo
+          t = open("../scripts/report/prompt.md", encoding="utf-8").read()
+          for k, v in {"NAME": os.environ["NAME"], "CODE": os.environ["CODE"], "MARKET": os.environ["MARKET"], "LANG": sys.argv[1],
+                       "TODAY": datetime.datetime.now(zoneinfo.ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d")}.items():
+              t = t.replace("{{" + k + "}}", v)
+          open("prompt.txt", "w", encoding="utf-8").write(t)
+          PY
+          start=$(date +%s)
+          claude -p "$(cat prompt.txt)" \
+            --allowedTools "Read,Write,Glob,Grep,WebSearch,WebFetch" \
+            --output-format json ${CLAUDE_MODEL:+--model "$CLAUDE_MODEL"} > claude.json || { tail -c 2000 claude.json; echo "::error::Claude 실행 실패"; exit 1; }
+          python3 - "$start" <<'PY'
+          import json, os, sys, time, datetime, zoneinfo
+          r = json.load(open("claude.json"))
+          if r.get("is_error"):
+              print("::error::Claude 오류:", str(r.get("result"))[:1500]); sys.exit(1)
+          md = open("out/report.md", encoding="utf-8").read() if os.path.exists("out/report.md") else ""
+          if len(md) < 1500:
+              print("::error::리포트가 만들어지지 않았거나 너무 짧습니다:", len(md)); print(str(r.get("result"))[:1500]); sys.exit(1)
+          now = datetime.datetime.now(zoneinfo.ZoneInfo("Asia/Seoul"))
+          meta = {"market": os.environ["MARKET"], "code": os.environ["CODE"], "name": os.environ["NAME"], "lang": os.environ["LANG_IN"],
+                  "date": now.strftime("%Y%m%d"), "created": now.isoformat(timespec="seconds"),
+                  "seconds": round(time.time() - int(sys.argv[1])), "chars": len(md), "pdf": False, "engine": "claude",
+                  "model": ",".join((r.get("modelUsage") or {}).keys()) or os.environ.get("CLAUDE_MODEL") or "default"}
+          json.dump(meta, open("out/meta.json", "w"), ensure_ascii=False)
+          print("완료:", meta)
+          open(os.environ["GITHUB_STEP_SUMMARY"], "a").write(f"- 모델: {meta['model']} · {meta['chars']:,}자 · {meta['seconds']}초 · 턴 {r.get('num_turns')}\n")
+          PY
 
       - name: 암호화해서 reports 브랜치에 저장
         run: |
           git fetch origin reports --depth=1 && git worktree add rep origin/reports || { git worktree add --detach rep && (cd rep && git checkout --orphan reports-new && git rm -rfq . ); }
-          node scripts/report/publish.mjs out rep
+          node scripts/report/publish.mjs work/out rep
           cd rep
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"

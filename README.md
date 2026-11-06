@@ -16,10 +16,13 @@
 
 ## AI 분석 리포트
 GitHub → Actions → **AI 리포트 요청** → Run workflow 에 종목 코드(예: 005930, NVDA)를 넣으면
-PRISM-INSIGHT 에이전트가 리포트를 만들어 사이트(판단 탭·목록 탭)에 암호화해 올립니다.
-- AI 모델: Google **Gemini** (LiteLLM 프록시로 PRISM 의 OpenAI 호출을 Gemini 로 연결). 기본은 쓸 수 있는 가장 높은 Pro 모델 자동 선택, 저장소 Variable `GEMINI_MODEL` 로 지정 가능
-- 필요한 Secret: `GEMINI_API_KEY` (선택: `PERPLEXITY_API_KEY` 또는 `TAVILY_API_KEY` 뉴스 검색, `FIRECRAWL_API_KEY`)
-- 한국 종목 시세는 **네이버 증권**(`scripts/report/naver_source.py`)으로 받습니다. KIS 키 3종(`KIS_APP_KEY`·`KIS_APP_SECRET`·`KIS_ACCOUNT`)을 넣으면 KIS를 씁니다.
+Claude Code(내 Claude 구독)가 리포트를 써서 사이트(판단 탭·목록 탭)에 암호화해 올립니다.
+1. `scripts/report/collect_data.py` — 네이버 증권(한국: 일봉·수급·투자지표·재무·업종·뉴스) / Yahoo(미국: 일봉) 자료를 `brief.md`·`raw_*.json` 으로 저장
+2. Claude Code CLI 가 `scripts/report/prompt.md` 지시대로 자료를 읽고 웹 검색으로 실적·공시·이슈를 확인해 리포트 작성
+3. `scripts/report/publish.mjs` 가 암호화해 `reports` 브랜치에 저장 → 사이트 재배포
+- 필요한 Secret: `CLAUDE_CODE_OAUTH_TOKEN` (PC에서 `claude setup-token` 으로 발급, API 키 아님)
+- 선택 Variable: `CLAUDE_MODEL` (예: `opus`, `sonnet`. 비우면 구독 기본 모델)
+- 사용량은 Claude 구독 한도에서 차감됩니다(별도 과금 없음).
 
 ## 동작 방식
 1. GitHub Actions(`.github/workflows/update.yml`)가 평일 장 마감 뒤 `scripts/collect.mjs`로 자료를 수집합니다.

@@ -224,7 +224,7 @@ async function loadBytes(url) {
 }
 const repRow = (x) => `<tr class="go" data-rep="${x.id}"><td><span class="nm"><b>${esc(x.name)}</b><span>${x.code}</span></span></td><td class="note">${x.market} · ${x.lang === 'en' ? '영어' : '한국어'}</td><td class="r">${ymd(x.date)}</td><td class="r">${x.pdf ? 'PDF' : ''}</td></tr>`;
 function requestHTML(code) {
-  return `<div class="req-box"><b>새 리포트 요청</b> (GitHub Actions로 5~15분, OpenAI 이용료 발생)
+  return `<div class="req-box"><b>새 리포트 요청</b> (GitHub Actions로 5~15분, Claude 구독 사용량으로 처리)
     <ol><li><a href="${RUN_URL}" target="_blank" rel="noopener">요청 페이지 열기 ↗</a> (GitHub 로그인 필요, 휴대폰은 GitHub 앱에서도 됩니다)</li>
     <li>오른쪽 <b>Run workflow</b>를 누르고 종목 코드에 ${code ? `<span class="code-chip" data-copy="${code}" title="눌러서 복사">${code}</span>` : '코드(예: 005930, NVDA)'} 를 넣은 뒤 초록 <b>Run workflow</b></li>
     <li>끝나면 이 화면에 자동으로 올라옵니다(새로고침)</li></ol></div>`;
@@ -233,7 +233,7 @@ async function rAiRep() {
   const box = $('#aiRepBox'); if (!box || !S.code) return;
   const list = (await loadReports()).filter((x) => x.code === S.code);
   box.innerHTML = (list.length ? `<table class="tbl">${list.map(repRow).join('')}</table>` : '<p class="note">아직 이 종목의 AI 리포트가 없습니다.</p>') + requestHTML(S.code)
-    + '<p class="note">PRISM-INSIGHT의 AI 에이전트들이 기술적 분석·수급·기업 현황·기업 개요·뉴스·시장 분석과 투자 전략을 씁니다. 참고 자료이며 투자 권유가 아닙니다.</p>';
+    + '<p class="note">Claude가 네이버 증권 자료와 웹 검색을 바탕으로 기술적 분석·수급·실적·산업·뉴스·시장 환경·리스크·시나리오를 씁니다. 참고 자료이며 투자 권유가 아닙니다.</p>';
 }
 async function rRepList() {
   const box = $('#repList'); if (!box) return;
