@@ -196,7 +196,8 @@ def main():
         # brief
         if basic: B.append(f"- 시장: {basic.get('stockExchangeType', {}).get('nameKor') or basic.get('stockExchangeName') or ''}")
         if integ:
-            ind = integ.get("industryName") or (integ.get("industryCompareInfo") or {}).get("industryName")
+            ici = integ.get("industryCompareInfo")
+            ind = integ.get("industryName") or (ici.get("industryName") if isinstance(ici, dict) else "")
             if ind: B.append(f"- 업종: {ind}")
             B += ["", "## 투자 지표 (네이버 증권 최신값)", "", "| 항목 | 값 |", "|---|---|"]
             for i in integ.get("totalInfos") or []:

@@ -97,6 +97,17 @@ jobs:
           open(os.environ["GITHUB_STEP_SUMMARY"], "a").write(f"- 모델: {meta['model']} · {meta['chars']:,}자 · {meta['seconds']}초 · 턴 {r.get('num_turns')}\n")
           PY
 
+      - name: 수집 자료·결과 보관 (확인용, 7일)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-work
+          path: |
+            work/data/brief.md
+            work/out/
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: 암호화해서 reports 브랜치에 저장
         run: |
           git fetch origin reports --depth=1 && git worktree add rep origin/reports || { git worktree add --detach rep && (cd rep && git checkout --orphan reports-new && git rm -rfq . ); }
