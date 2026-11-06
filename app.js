@@ -46,10 +46,13 @@ const vtag = (v) => `<span class="tag ${VCLS[v] || 'v-no'}">${v}</span>`;
 const STCLS = { '강한 진입': 's-strong', 진입: 's-in', '진입 준비': 's-ready' };
 const sttag = (s) => (s ? `<span class="st ${STCLS[s]}">${s}</span>` : '<span class="st">-</span>');
 const nm = (s) => `<span class="nm"><b>${esc(s.name)}</b><span>${s.code}</span></span>`;
-function rejudge() { S.J = {}; for (const s of S.sum.stocks) S.J[s.code] = E.judge(s, S.cfg); }
+function rejudge() { S.J = {}; for (const s of S.sum.stocks) { s.mkt = S.sum.pulse?.[s.market]?.state || null; S.J[s.code] = E.judge(s, S.cfg); } }
+const rstag = (s) => (s.rs == null ? '<span class="rs rs-na" title="기록 1년 미만">RS -</span>' : `<span class="rs ${s.rs >= 80 ? 'rs-hi' : s.rs >= 50 ? 'rs-mid' : 'rs-lo'}" title="상대강도 1~99 (20일 전 ${s.rs20 ?? '-'})">RS ${s.rs}${s.rs20 != null && s.rs - s.rs20 >= 10 ? '↑' : s.rs20 != null && s.rs20 - s.rs >= 10 ? '↓' : ''}</span>`);
+const PCLS = { UPTREND: 'p-up', UNDER_PRESSURE: 'p-press', CORRECTION: 'p-corr' };
+const ptag = (p) => (p ? `<span class="ptag ${PCLS[p.state]}">${p.label}</span>` : '<span class="ptag">-</span>');
 
 /* ───── 탭 ───── */
-const TABS = ['market', 'judge', 'streak', 'sector', 'chart', 'table', 'force', 'list', 'sim'];
+const TABS = ['market', 'judge', 'streak', 'screen', 'sector', 'chart', 'table', 'force', 'list', 'sim'];
 let tab = 'market';
 function go(t, keepScroll) {
   if (!TABS.includes(t)) t = 'market';
@@ -90,21 +93,40 @@ document.addEventListener('click', (e) => { if (e.target.closest('#sheetList [da
 /* ───── 렌더 ───── */
 function render() {
   if (!S.sum) return;
-  const R = { market: rMarket, judge: rJudge, streak: rStreak, sector: rSector, chart: rChart, table: rTable, force: rForce, list: rList, sim: rSim }[tab];
+  const R = { market: rMarket, judge: rJudge, streak: rStreak, screen: rScreen, sector: rSector, chart: rChart, table: rTable, force: rForce, list: rList, sim: rSim }[tab];
   if (['judge', 'chart', 'table', 'force'].includes(tab)) { if (!S.rec) { $$(`[data-tab="${tab}"]`).forEach((el) => { if (!el.querySelector('.gate-msg')) el.insertAdjacentHTML('afterbegin', '<p class="gate-msg">위의 「종목 선택」에서 종목을 고르세요.</p>'); }); return; } rHero(); }
   R();
 }
 function rHero() {
   const s = S.byCode[S.code], j = S.J[S.code];
   $('#hero').innerHTML = `<div><div class="h-name">${esc(s.name)}<span>${s.code} · ${s.market}${s.sector ? ' · ' + esc(s.sector) : ''}</span></div>
-    <div class="h-px">${fmt(s.c)}원 <span class="${cls(s.chg)}">${pct(s.chg, 2)}</span> · 20일 <span class="${cls(s.ret20)}">${pct(s.ret20)}</span> · ${sttag(s.strength)}${s.streak ? ` <small>${s.streak}일째</small>` : ''}</div></div>
+    <div class="h-px">${fmt(s.c)}원 <span class="${cls(s.chg)}">${pct(s.chg, 2)}</span> · 20일 <span class="${cls(s.ret20)}">${pct(s.ret20)}</span> · ${sttag(s.strength)}${s.streak ? ` <small>${s.streak}일째</small>` : ''} · ${rstag(s)}</div></div>
     <div class="h-verdict">${vtag(j.verdict)}</div>
-    <div class="h-reason">${esc(j.reason)} · 기준일 ${ymd(s.date)}</div>`;
+    <div class="h-reason">${esc(j.reason)} · ${s.market} ${ptag(S.sum.pulse?.[s.market])} · 기준일 ${ymd(s.date)}</div>`;
   $$('[data-tab] .gate-msg').forEach((el) => el.remove());
 }
 
 /* 시장 */
+function rPulse() {
+  const P = S.sum.pulse || {};
+  if (!Object.keys(P).length) { $('#pulseBox').innerHTML = '<p class="note">지수 자료가 아직 없습니다. 다음 수집 때 채워집니다.</p>'; return; }
+  const yn = (v, a, b) => (v == null ? '-' : v === 'above' || v === 'up' || v === 'golden' ? `<span class="pass">${a}</span>` : `<span class="fail">${b}</span>`);
+  $('#pulseBox').innerHTML = `<div class="two">${['KOSPI', 'KOSDAQ'].filter((k) => P[k]).map((k) => { const p = P[k], m = p.ma; return `<div class="pulse-card">
+    <div class="pc-h"><b>${k === 'KOSPI' ? '코스피' : '코스닥'}</b> ${ptag(p)} <span class="r">${fmt(m.close, 2)} <span class="${cls(m.chg)}">${pct(m.chg / 100, 2)}</span></span></div>
+    <div class="dd-bar" title="분산일 ${p.dd}/25">${Array.from({ length: 8 }, (_, i) => `<i class="${i < p.dd ? (p.dd >= 6 ? 'on corr' : p.dd >= 4 ? 'on press' : 'on') : ''}"></i>`).join('')}<span>분산일 <b>${p.dd}</b>일${p.state === 'CORRECTION' && p.rallyDay ? ` · 반등 ${p.rallyDay}일째(추종일 대기)` : ''}</span></div>
+    <table class="tbl num"><tr><td>20일선</td><td>${yn(m.vs20, '위', '아래')} · 기울기 ${yn(m.trend20, '상승', '하락')}</td></tr><tr><td>60일선 / 120일선</td><td>${yn(m.vs60, '위', '아래')} / ${yn(m.vs120, '위', '아래')}</td></tr><tr><td>60·120일선</td><td>${yn(m.cross60_120, '정배열', '역배열')}</td></tr><tr><td>2주 변화 · 52주 고점 대비</td><td><span class="${cls(m.chg2w)}">${pct(m.chg2w / 100)}</span> · <span class="down">${pct(m.close / m.high52 - 1)}</span></td></tr></table></div>`; }).join('')}</div>`;
+  const k = segVal('pulseIdx') || 'KOSPI', h = (P[k] || P.KOSPI).hist, ch = newChart('#chPulse', { localization: { locale: 'ko-KR', priceFormatter: (v) => fmt(v, 0) } });
+  const col = { UPTREND: 'rgba(0,130,84,.10)', UNDER_PRESSURE: 'rgba(201,138,0,.16)', CORRECTION: 'rgba(211,47,47,.14)' };
+  const bg = ch.addHistogramSeries({ priceScaleId: 'bg', priceLineVisible: false, lastValueVisible: false }); ch.priceScale('bg').applyOptions({ scaleMargins: { top: 0, bottom: 0 }, visible: false });
+  bg.setData(h.map((x) => ({ time: ymd(x.d), value: 1, color: col[x.state] })));
+  const ln = ch.addLineSeries({ color: '#1b1f24', lineWidth: 2, priceLineVisible: false, title: k });
+  ln.setData(h.map((x) => ({ time: ymd(x.d), value: x.c })));
+  ln.setMarkers(h.filter((x) => x.isDD || x.ftd).map((x) => x.ftd ? { time: ymd(x.d), position: 'belowBar', color: '#008254', shape: 'circle', text: '추종일' } : { time: ymd(x.d), position: 'aboveBar', color: '#d32f2f', shape: 'arrowDown', size: .6 }));
+  ch.timeScale().fitContent();
+}
+segInit('pulseIdx', rPulse);
 function rMarket() {
+  rPulse();
   const st = S.sum.stocks, m = S.sum.market, L = m.dates.length - 1;
   $('#mkDate').textContent = ymd(S.sum.date) + ` · ${S.sum.n}종목`;
   const sumK = (arr, k) => arr.slice(-k).reduce((a, b) => a + b, 0);
@@ -139,13 +161,16 @@ function rJudge() {
   const s = S.byCode[S.code], j = S.J[S.code], cfg = S.cfg;
   const req = Object.entries(cfg.req).filter(([, v]) => v).map(([k]) => k);
   const st = (ok, txt) => `<span class="${ok == null ? 'unk' : ok ? 'pass' : 'fail'}">${ok == null ? '미확인' : ok ? txt || '통과' : '미통과'}</span>`;
-  const trendReq = cfg.trend.strong || cfg.trend.rebound;
-  const trendOk = (!cfg.trend.strong || s.trendStrong) && (!cfg.trend.rebound || s.ck.rebound);
+  const trendReq = cfg.trend.strong || cfg.trend.rebound || cfg.trend.market;
+  const MP = S.sum.pulse?.[s.market];
+  const trendOk = (!cfg.trend.strong || s.trendStrong) && (!cfg.trend.rebound || s.ck.rebound) && (!cfg.trend.market || s.mkt !== 'CORRECTION');
   $('#basis').innerHTML = [
     ['① 수급 후보', st(j.cand, '후보'), `켜진 신호 ${j.k}개 / 기준 ${cfg.minSignals}개 · 후보 강도 ${s.strength || '없음'}`],
     ['② 진입 확인', j.cand ? st(!j.fails.length) : '<span class="unk">-</span>', req.length ? `필수 ${req.length}개 중 ${req.length - j.fails.length}개 통과` + (j.fails.length ? ' · 미통과: ' + j.fails.map((f) => E.CHECKS.find((x) => x[0] === f)[1].split(' (')[0]).join(', ') : '') : '필수 조건 없음'],
-    ['③ 추세 확인', trendReq ? st(trendOk) : '<span class="unk">사용 안 함</span>', trendReq ? [cfg.trend.strong && `추세 강세 ${s.trendStrong ? '확인' : '미확인'}`, cfg.trend.rebound && `오늘 반등 ${s.ck.rebound ? '확인' : '미확인'}`].filter(Boolean).join(' · ') : '기준선 설정에서 켤 수 있습니다'],
+    ['③ 추세 확인', trendReq ? st(trendOk) : '<span class="unk">사용 안 함</span>', trendReq ? [cfg.trend.strong && `추세 강세 ${s.trendStrong ? '확인' : '미확인'}`, cfg.trend.rebound && `오늘 반등 ${s.ck.rebound ? '확인' : '미확인'}`, cfg.trend.market && `${s.market} ${MP ? MP.label : '국면 미확인'}`].filter(Boolean).join(' · ') : '기준선 설정에서 켤 수 있습니다'],
     ['④ 분석 보고서', '<span class="unk">미반영</span>', '보고서 기능은 이 사이트에 없어 수급 규칙만으로 판단합니다'],
+    ['참고 · 상대강도', rstag(s), s.rs == null ? '기록이 1년이 안 돼 계산하지 않습니다' : `분석 종목 중 상위 ${100 - s.rs}% 수준 (3개월 수익률 2배 가중 + 6·9·12개월). 20일 전 ${s.rs20 ?? '-'}`],
+    ['참고 · 시장 국면', ptag(MP), MP ? `${s.market} 분산일 ${MP.dd}일 / 25거래일${MP.state === 'CORRECTION' && MP.rallyDay ? ` · 반등 ${MP.rallyDay}일째` : ''} · 판단에 반영하려면 ③ 설정을 켜세요` : '지수 자료 없음'],
   ].map(([a, b, c]) => `<div class="basis-row"><b>${a}</b>${b}<span>${c}</span></div>`).join('') + `<div class="basis-row"><b>종합 판단</b>${vtag(j.verdict)}<span>${esc(j.reason)}</span></div>`;
   rCfg();
   const i = S.rec.d.length - 1, A = S.A;
@@ -166,6 +191,7 @@ function rCfg() {
     <h4>③ 추세 확인</h4>
     <label class="chk"><input type="checkbox" data-trend="strong"${c.trend.strong ? ' checked' : ''}> 추세 강세 필요: 종가가 20일선보다 8.5% 이상 위 & 세력 5일 순매수 금액이 20일 평균 거래대금의 2.5% 이하</label>
     <label class="chk"><input type="checkbox" data-trend="rebound"${c.trend.rebound ? ' checked' : ''}> 오늘 반등 확인 필요: 종가가 직전 3거래일 최고 종가를 돌파</label>
+    <label class="chk"><input type="checkbox" data-trend="market"${c.trend.market ? ' checked' : ''}> 시장 국면 확인: 해당 시장(코스피/코스닥)이 「조정 국면」이면 매수보류 (PRISM 방식)</label>
     <label class="chk"><input type="checkbox" data-cfg="unknownPass"${c.unknownPass ? ' checked' : ''}> 미확인 조건은 통과로 봄</label>
     <div><button type="button" class="btn" id="cfgReset">기본값으로 되돌리기</button></div>
     <p class="note">기본값은 검증용 초기값이며 최적값이 아닙니다. 설정은 이 브라우저에만 저장됩니다. 신호 계산은 그대로이고, 어디까지를 통과로 볼지만 바뀝니다.</p></div>`;
@@ -205,6 +231,23 @@ function rStreak() {
 }
 segInit('jFilter', rStreak);
 ['luDate', 'stDate', 'jStreak3'].forEach((id) => $('#' + id).addEventListener('change', rStreak));
+
+/* 포착(급등주 스크리너) */
+function rScreen() {
+  const sc = S.sum.screen; if (!sc) { $('#scBody').innerHTML = '<p class="note">포착 자료가 아직 없습니다. 다음 수집 때 채워집니다.</p>'; return; }
+  const sel = $('#scDate'); if (!sel.options.length) sel.innerHTML = [...sc.dates].reverse().map((d) => `<option value="${d}">${ymd(d)}${d === S.sum.date ? ' (최신)' : ''}</option>`).join('');
+  const d = sel.value, day = sc.byDate[d] || {}, onlyRs = $('#scRs').checked, multi = $('#scMulti').checked;
+  const hits = {}; for (const t of sc.triggers) for (const x of day[t.key] || []) (hits[x.code] = hits[x.code] || []).push(t.name);
+  const P = S.sum.pulse || {}, ph = (k) => { const h = P[k]?.hist?.find((x) => x.d === d); return h ? `${k === 'KOSPI' ? '코스피' : '코스닥'} ${ptag({ state: h.state, label: { UPTREND: '상승 추세', UNDER_PRESSURE: '압박 받는 상승', CORRECTION: '조정 국면' }[h.state] })} 분산일 ${h.dd}` : ''; };
+  $('#scMarket').innerHTML = `그날 시장: ${ph('KOSPI')} · ${ph('KOSDAQ')} — PRISM은 조정 국면에서 신규 매수를 줄입니다.`;
+  const latest = d === S.sum.date;
+  const col = { volume_surge: (x) => `거래량 ${x.volInc > 0 ? '+' : ''}${fmt(x.volInc)}%`, gap_up: (x) => `갭 ${pct(x.gap / 100)}`, value_to_cap: (x) => `시총 대비 ${x.ratio}%`, daily_rise: (x) => `거래대금 ${fmt(x.amount)}억`, closing_strength: (x) => `마감 강도 ${(x.cs * 100).toFixed(0)}%`, volume_flat: (x) => `거래량 +${fmt(x.volInc)}%` };
+  $('#scBody').innerHTML = sc.triggers.map((t) => {
+    const list = (day[t.key] || []).filter((x) => S.byCode[x.code] && (!onlyRs || (S.byCode[x.code].rs ?? 0) >= 70) && (!multi || hits[x.code].length >= 2));
+    return `<h3>${t.name} <small>${list.length}종목</small></h3><p class="note" style="margin:0 0 6px">${t.desc}</p>` + (list.length ? `<table class="tbl"><tr><th>종목</th><th class="r">그날 종가</th><th class="r">등락</th><th class="r hide-m">근거</th><th class="r">RS</th><th>오늘 판단</th><th class="r">${latest ? '수급 후보' : '이후'}</th></tr>` + list.map((x) => { const s = S.byCode[x.code], after = s.c / x.c - 1; return `<tr class="go" data-code="${x.code}"><td>${nm(s)}${hits[x.code].length >= 2 ? ` <span class="st s-strong" title="${hits[x.code].join(', ')}">${hits[x.code].length}중</span>` : ''}</td><td class="r">${fmt(x.c)}</td><td class="r ${cls(x.chg)}">${pct(x.chg / 100)}</td><td class="r hide-m note">${col[t.key](x)}</td><td class="r">${s.rs ?? '-'}</td><td>${vtag(S.J[x.code].verdict)}</td><td class="r">${latest ? sttag(s.strength) : `<span class="${cls(after)}">${pct(after)}</span>`}</td></tr>`; }).join('') + '</table>' : '<p class="note">해당 종목 없음</p>');
+  }).join('');
+}
+['scDate', 'scRs', 'scMulti'].forEach((id) => $('#' + id).addEventListener('change', rScreen));
 
 /* 업종 */
 function spark(cv, g) {
@@ -331,10 +374,11 @@ function rList() {
   const q = $('#q').value, m = $('#qMarket').value, sc = sel.value;
   const res = S.sum.stocks.filter((s) => matchQ(s, q) && (!m || s.market === m) && (!sc || s.sector === sc));
   $('#qTable').innerHTML = (q || m || sc) ? (res.length ? `<tr><th>종목</th><th>시장 · 업종</th><th>상태</th></tr>` + res.slice(0, 60).map((s) => `<tr class="go" data-code="${s.code}"><td>${nm(s)}</td><td class="note">${s.market} · ${esc(s.sector || '-')}</td><td>${vtag(S.J[s.code].verdict)}</td></tr>`).join('') : '<tr><td class="empty">찾는 종목이 분석 대상에 없습니다(코스피 시가총액 상위 200 + 코스닥 상위 150)</td></tr>') : '';
-  const all = [...S.sum.stocks].sort((a, b) => VRANK[S.J[a.code].verdict] - VRANK[S.J[b.code].verdict] || (b.strength ? 1 : 0) - (a.strength ? 1 : 0) || b.sig.filter(Boolean).length - a.sig.filter(Boolean).length || b.amt20 - a.amt20);
-  $('#rankTable').innerHTML = `<tr><th>종목</th><th>판단</th><th class="r">20일</th><th>핵심 세력</th></tr>` + all.map((s) => { const k = Math.abs(s.f20) >= Math.abs(s.o20) ? ['외국인', s.f20] : ['기관', s.o20]; return `<tr class="go" data-code="${s.code}"><td>${nm(s)}</td><td>${vtag(S.J[s.code].verdict)} ${s.strength ? sttag(s.strength) : ''}</td><td class="r ${cls(s.ret20)}">${pct(s.ret20)}</td><td class="note">${k[0]} <span class="${cls(k[1])}">${eok(k[1])}억</span></td></tr>`; }).join('');
+  const byRs = $('#rankSort')?.value === 'rs';
+  const all = [...S.sum.stocks].sort((a, b) => byRs ? (b.rs ?? -1) - (a.rs ?? -1) : VRANK[S.J[a.code].verdict] - VRANK[S.J[b.code].verdict] || (b.strength ? 1 : 0) - (a.strength ? 1 : 0) || b.sig.filter(Boolean).length - a.sig.filter(Boolean).length || b.amt20 - a.amt20);
+  $('#rankTable').innerHTML = `<tr><th>종목</th><th>판단</th><th class="r">RS</th><th class="r">20일</th><th class="hide-m">핵심 세력</th></tr>` + all.map((s) => { const k = Math.abs(s.f20) >= Math.abs(s.o20) ? ['외국인', s.f20] : ['기관', s.o20]; return `<tr class="go" data-code="${s.code}"><td>${nm(s)}</td><td>${vtag(S.J[s.code].verdict)} ${s.strength ? sttag(s.strength) : ''}</td><td class="r">${s.rs ?? '-'}</td><td class="r ${cls(s.ret20)}">${pct(s.ret20)}</td><td class="hide-m "note">${k[0]} <span class="${cls(k[1])}">${eok(k[1])}억</span></td></tr>`; }).join('');
 }
-['q', 'qMarket', 'qSector'].forEach((id) => $('#' + id).addEventListener('input', rList));
+['q', 'qMarket', 'qSector', 'rankSort'].forEach((id) => $('#' + id)?.addEventListener('input', rList));
 
 /* 모의투자 */
 const SIM_KEY = 'sd.sim';

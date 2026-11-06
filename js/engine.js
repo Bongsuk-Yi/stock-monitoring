@@ -10,7 +10,7 @@
   const DEFAULT_CFG = {
     minSignals: 2,                 // ① 수급 후보: 켜진 신호 수
     req: { rebound: false, flow5: false, days5: true, chase: true, rr: false, liquidity: true },
-    trend: { strong: false, rebound: false },
+    trend: { strong: false, rebound: false, market: false },
     unknownPass: true,             // 미확인 조건은 통과로 본다
   };
   const CHECKS = [
@@ -147,6 +147,7 @@
     const tf = [];
     if (cfg.trend.strong && !s.trendStrong) tf.push('추세 강세 미확인');
     if (cfg.trend.rebound && !s.ck.rebound) tf.push('오늘 반등 미확인');
+    if (cfg.trend.market && s.mkt === 'CORRECTION') tf.push(`${s.market} 조정 국면`);
     if (tf.length) return { verdict: '매수보류', reason: tf.join(', '), cand, fails, unknown, k };
     return { verdict: '매수진입', reason: '모든 기준 통과' + (unknown.length ? ' (미확인 조건 포함)' : ''), cand, fails, unknown, k };
   }

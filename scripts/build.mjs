@@ -3,6 +3,7 @@
 import { readFileSync, writeFileSync, mkdirSync, rmSync, cpSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
+import { screenDay, TRIGGERS, SCREEN, marketPulse, maSummary, PULSE_KO, rsRaw, rsRatings } from './prism-rules.mjs';
 import { sitePassword, encrypt, makeKey, decryptNode, gatePage, LOCK_SNIPPET } from './gate.mjs';
 
 const require = createRequire(import.meta.url);
@@ -66,7 +67,29 @@ const secList = (store.sectors?.list || []).map((g) => {
   return { name: g.name, members: g.members, names: g.names, n, acc: F.acc.map(Math.round), ma5: F.ma5.map((x) => (x == null ? null : Math.round(x))), ma20: F.ma20.map((x) => (x == null ? null : Math.round(x))), net1: net[L] || 0, net5: sum(5), net20: sum(20), up: F.ma5[L] != null && F.ma20[L] != null && F.ma5[L] > F.ma20[L], ratio: F.ratio[L] };
 });
 
-put('data/summary.json', { built: new Date().toISOString(), date: lastDate, n: rows.length, stocks: rows, market: mk, hist, sectors: secList, secDates });
+/* ── PRISM 규칙: RS · 시장 국면 · 급등주 포착 ── */
+const raw = {}; for (const r of recs) if (r.d.at(-1) === lastDate) raw[r.code] = rsRaw(r.c);
+const RS = rsRatings(raw);
+for (const s of rows) s.rs = RS[s.code] ?? null;
+// RS 의 20거래일 전 값(상대강도가 올라오는 중인지 보기 위해)
+const raw20 = {}; for (const r of recs) if (r.d.at(-1) === lastDate && r.c.length > 273) raw20[r.code] = rsRaw(r.c.slice(0, -20));
+const RS20 = rsRatings(raw20); for (const s of rows) s.rs20 = RS20[s.code] ?? null;
+
+const pulse = {};
+for (const [sym, bars] of Object.entries(store.indices || {})) {
+  if (!bars?.d?.length) continue;
+  const P = marketPulse(bars), last = P.at(-1);
+  pulse[sym] = { state: last.state, label: PULSE_KO[last.state], dd: last.dd, rallyDay: last.rallyDay, date: last.d, ma: maSummary(bars), hist: P.slice(-120) };
+}
+
+const caps = store.caps || {};
+const screenDates = dates.slice(-20);
+const screen = { triggers: TRIGGERS, rule: SCREEN, dates: screenDates, byDate: {} };
+const live = recs.filter((r) => r.d.at(-1) === lastDate);
+for (const d of screenDates) screen.byDate[d] = screenDay(live, d, caps);
+for (const s of rows) s.cap = caps[s.code] ? Math.round(caps[s.code] / 1e8) : null;   // 억원
+
+put('data/summary.json', { built: new Date().toISOString(), date: lastDate, n: rows.length, stocks: rows, market: mk, hist, sectors: secList, secDates, pulse, screen });
 writeFileSync(join(dist, 'data', 'key.json'), JSON.stringify({ salt: K.salt.toString('base64') }));
 
 /* ── HTML 암호화 ── */
@@ -75,4 +98,5 @@ let html = readFileSync(join(dist, 'index.html'), 'utf8').replace(/(href|src)="(
 writeFileSync(join(dist, 'index.html'), gatePage({ title: '수급분석 모니터링', mark: '📊', storeKey: STORE_KEY, envelope: encrypt(html, pw), theme: 'light' }));
 writeFileSync(join(dist, '.nojekyll'), '');
 const size = (p) => (statSync(p).isDirectory() ? readdirSync(p).reduce((s, f) => s + size(join(p, f)), 0) : statSync(p).size);
+console.log(`PRISM 규칙: RS ${Object.values(RS).filter((x) => x != null).length}종목, 국면 ${Object.entries(pulse).map(([k, v]) => k + '=' + v.state + '/DD' + v.dd).join(' ')}, 포착 ${Object.values(screen.byDate[lastDate] || {}).reduce((a, x) => a + x.length, 0)}건`);
 console.log(`빌드 완료: 기준일 ${lastDate || '-'}, 종목 ${rows.length}, 업종 ${secList.length}, dist ${(size(dist) / 1048576).toFixed(1)}MB`);

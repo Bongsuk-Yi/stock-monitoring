@@ -37,13 +37,14 @@ async function pool(items, n, fn) {
    코스피200 구성종목 목록은 공개 주소가 없어져, 코스피 시가총액 상위 보통주 200개로 대신한다. */
 const M = 'https://m.stock.naver.com/api';
 const isCommon = (x) => x.stockEndType === 'stock' && /^\d{5}0$/.test(x.itemCode);
+const CAPS = {};                    // 시가총액(원) — marketValue 는 억원 단위
 async function marketTop(market, n) {
   const out = new Map();
   for (let p = 1; out.size < n && p <= 10; p++) {
     const j = await get(`${M}/stocks/marketValue/${market}?page=${p}&pageSize=100`, { enc: 'utf-8', json: true });
     const list = (j.stocks || []).filter(isCommon);
     if (!(j.stocks || []).length) break;
-    for (const x of list) { if (out.size >= n) break; out.set(x.itemCode, x.stockName); }
+    for (const x of list) { if (out.size >= n) break; out.set(x.itemCode, x.stockName); CAPS[x.itemCode] = (num(x.marketValue) || 0) * 1e8; }
   }
   return out;
 }
@@ -74,6 +75,16 @@ async function ohlcv(code, count) {
     if (c > 0) rows[m[1]] = { o, h, l, c, v };
   }
   return rows;
+}
+/* ── 지수 일봉(KOSPI·KOSDAQ, 거래량 포함) — 시장 국면 판정용 ── */
+async function indexBars(symbol, count) {
+  const xml = await get(`https://fchart.stock.naver.com/sise.nhn?symbol=${symbol}&timeframe=day&count=${count}&requestType=0`);
+  const d = [], o = [], h = [], l = [], c = [], v = [];
+  for (const m of xml.matchAll(/data="(\d{8})\|([^"]+)"/g)) {
+    const [oo, hh, ll, cc, vv] = m[2].split('|').map(Number);
+    if (cc > 0) { d.push(m[1]); o.push(oo); h.push(hh); l.push(ll); c.push(cc); v.push(vv || null); }
+  }
+  return { d, o, h, l, c, v };
 }
 /* ── 종목별 외국인·기관 순매수(수량): bizdate 를 커서로 과거로 넘긴다 ── */
 async function investors(code, days) {
@@ -137,6 +148,10 @@ function fromRows(rows) {
   // 대상에서 빠진 종목은 30거래일 뒤 정리
   const live = new Set(uni.map((u) => u.code));
   for (const [code, rec] of Object.entries(store.stocks)) if (!live.has(code)) { rec.dropped = (rec.dropped || 0) + 1; if (rec.dropped > 30) delete store.stocks[code]; } else delete rec.dropped;
+  const idx = {};
+  for (const sym of ['KOSPI', 'KOSDAQ']) { try { idx[sym] = await indexBars(sym, KEEP); console.log(`지수 ${sym} ${idx[sym].d.length}일`); } catch (e) { console.warn('지수 실패', sym, e.message); } }
+  store.indices = { ...(store.indices || {}), ...idx };
+  store.caps = { ...(store.caps || {}), ...CAPS };
   store.universe = uni; store.sectors = sec; store.updated = new Date().toISOString();
   console.log(`수집 ${ok}/${uni.length} 성공, 실패 ${bad} · 요청 ${reqs}회(실패 ${fails}) · ${Math.round((Date.now() - t0) / 1000)}초`);
   if (ok < uni.length * .6) throw new Error('수집 성공률이 너무 낮아 저장하지 않습니다');

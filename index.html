@@ -30,7 +30,11 @@
   <section class="card hero" id="hero" data-tabs="judge chart table force"></section>
 
   <!-- ───── 시장 ───── -->
-  <nav class="subnav" data-tab="market"><a href="#mk-sum">오늘 요약</a><a href="#mk-acc">주체별</a><a href="#mk-top">Top</a><a href="#mk-sec">업종</a><a href="#mk-lu">상한가</a></nav>
+  <nav class="subnav" data-tab="market"><a href="#mk-pulse">시장 국면</a><a href="#mk-sum">오늘 요약</a><a href="#mk-acc">주체별</a><a href="#mk-top">Top</a><a href="#mk-sec">업종</a><a href="#mk-lu">상한가</a></nav>
+  <section class="card" id="mk-pulse" data-tab="market"><h2>시장 국면 <small>Market Pulse · 오닐식</small></h2><div id="pulseBox"></div>
+    <div class="seg-row"><div class="seg" id="pulseIdx"><button data-v="KOSPI" class="on">코스피</button><button data-v="KOSDAQ">코스닥</button></div></div>
+    <div class="chart" id="chPulse"></div>
+    <p class="note">분산일 = 지수가 0.2% 이상 내리면서 거래량이 전날보다 많은 날(최근 25거래일, 이후 5% 이상 회복하면 소멸). 분산일 4~5일이면 「압박 받는 상승」, 6일 이상이거나 고점 대비 10% 넘게 빠지면 「조정 국면」입니다. 조정 국면은 반등 4일째 이후 +1.25% 이상·거래량 증가(추종일)나 이전 고점 회복으로 끝납니다. ▼ 분산일 · ● 추종일. 규칙 출처: PRISM-INSIGHT.</p></section>
   <section class="card" id="mk-sum" data-tab="market"><h2>오늘의 수급 <small id="mkDate"></small></h2><div id="mkSum"></div>
     <p class="note">분석 종목(코스피 시가총액 상위 200 + 코스닥 상위 150) 안에서 순매수 수량 × 종가를 더한 값입니다. 거래소 전체 집계와 다릅니다.</p></section>
   <section class="card" id="mk-acc" data-tab="market"><h2>주체별 누적 순매수 <small>최근 60거래일 · 억원</small></h2><div class="chart" id="mkAccChart"></div></section>
@@ -71,6 +75,13 @@
     <h3>곧 5일이 되는 종목 (3~4일 연속)</h3><table class="tbl" id="st34"></table>
     <h3>과거 성과가 나빠 제외한 종목</h3><table class="tbl" id="stBad"></table></section>
 
+  <!-- ───── 포착 (급등주 스크리너) ───── -->
+  <section class="card" id="screen" data-tab="screen"><h2>급등주 포착 <small>PRISM 트리거 6종 · 장 마감 일봉 기준</small></h2>
+    <div class="seg-row"><label>날짜 <select id="scDate"></select></label><label class="chk"><input type="checkbox" id="scRs"> RS 70 이상만</label><label class="chk"><input type="checkbox" id="scMulti"> 2개 이상 트리거 겹친 종목만</label></div>
+    <div id="scMarket" class="note" style="margin:0 0 8px"></div>
+    <div id="scBody"></div>
+    <p class="note">공통 조건: 거래대금 100억원 이상, 시가총액 5,000억원 이상, 당일 상승률 15% 이하, 거래량이 분석 종목 평균의 20% 이상. 원본은 장중(오전·오후)에 돌리지만 여기서는 장 마감 일봉으로 계산합니다. 「이후」는 그날 종가에서 최신 종가까지의 수익률입니다. 포착 목록은 후보일 뿐 매수 신호가 아닙니다.</p></section>
+
   <!-- ───── 업종 ───── -->
   <nav class="subnav" data-tab="sector"><a href="#sector">매집이평선</a><a href="#seclist">업종·구성 종목</a></nav>
   <section class="card" id="sector" data-tab="sector"><h2>업종별 수급 — 매집이평선</h2>
@@ -109,7 +120,7 @@
   <section class="card" id="find" data-tab="list"><h2>종목 검색</h2>
     <div class="seg-row"><input id="q" placeholder="종목명 또는 코드" autocomplete="off"><select id="qMarket"><option value="">시장 전체</option><option>KOSPI</option><option>KOSDAQ</option></select><select id="qSector"><option value="">업종 전체</option></select></div>
     <table class="tbl" id="qTable"></table></section>
-  <section class="card" id="rank" data-tab="list"><h2>종목 모아보기</h2><p class="note">줄을 누르면 그 종목 분석으로 바뀝니다. 진입 신호가 있는 종목이 위에 옵니다.</p><table class="tbl" id="rankTable"></table></section>
+  <section class="card" id="rank" data-tab="list"><h2>종목 모아보기</h2><div class="seg-row"><label>정렬 <select id="rankSort"><option value="verdict">종합 판단 순</option><option value="rs">상대강도(RS) 순</option></select></label></div><p class="note">줄을 누르면 그 종목 분석으로 바뀝니다. RS는 3개월 수익률을 2배로 두고 6·9·12개월 수익률을 더해 분석 종목 안에서 1~99로 매긴 값입니다(오닐식, 규칙 출처 PRISM-INSIGHT).</p><table class="tbl" id="rankTable"></table></section>
 
   <!-- ───── 모의투자 ───── -->
   <section class="card" data-tab="sim"><h2>내 모의투자 현황</h2><div id="simSum"></div><table class="tbl num" id="simPos"></table>
@@ -126,6 +137,7 @@
   <button type="button" data-go="market"><b>◎</b><span>시장</span></button>
   <button type="button" data-go="judge"><b>◆</b><span>판단</span></button>
   <button type="button" data-go="streak"><b>▲</b><span>강한진입</span></button>
+  <button type="button" data-go="screen"><b>⚡</b><span>포착</span></button>
   <button type="button" data-go="sector"><b>▦</b><span>업종</span></button>
   <button type="button" data-go="chart"><b>〽</b><span>차트</span></button>
   <button type="button" data-go="table"><b>▤</b><span>표</span></button>
