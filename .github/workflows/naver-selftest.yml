@@ -24,4 +24,4 @@ jobs:
           echo "--- GITHUB_ENV:"; cat "$GITHUB_ENV" | grep NAVER
           grep -c "원천: 네이버 증권" prism_core/kr_flow_evidence.py
       - working-directory: prism
-        run: python ../scripts/report/test_naver.py 000660 2>&1 | grep -E "체인 기능|^\[|flow_evidence_public|chain:"
+        run: python ../scripts/report/test_naver.py 035420 2>&1 | grep -E "체인 기능|flow_evidence_public"

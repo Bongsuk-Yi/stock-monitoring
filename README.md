@@ -14,6 +14,12 @@
   - **상대강도 RS**(2×3개월 + 6·9·12개월 수익률, 1~99) — 종목 요약·판단·목록·포착
   - 출처: https://github.com/dragon1086/prism-insight (규칙 아이디어 참고, 코드는 새로 작성)
 
+## AI 분석 리포트
+GitHub → Actions → **AI 리포트 요청** → Run workflow 에 종목 코드(예: 005930, NVDA)를 넣으면
+PRISM-INSIGHT 에이전트가 리포트를 만들어 사이트(판단 탭·목록 탭)에 암호화해 올립니다.
+- 필요한 Secret: `OPENAI_API_KEY` (선택: `PERPLEXITY_API_KEY` 또는 `TAVILY_API_KEY` 뉴스 검색, `FIRECRAWL_API_KEY`)
+- 한국 종목 시세는 **네이버 증권**(`scripts/report/naver_source.py`)으로 받습니다. KIS 키 3종(`KIS_APP_KEY`·`KIS_APP_SECRET`·`KIS_ACCOUNT`)을 넣으면 KIS를 씁니다.
+
 ## 동작 방식
 1. GitHub Actions(`.github/workflows/update.yml`)가 평일 장 마감 뒤 `scripts/collect.mjs`로 자료를 수집합니다.
 2. 누적 자료는 암호화해 `data` 브랜치의 `store.enc.json`에 보관합니다.
