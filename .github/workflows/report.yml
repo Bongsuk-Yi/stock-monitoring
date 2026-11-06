@@ -31,7 +31,8 @@ jobs:
     timeout-minutes: 60
     env:
       SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
       KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
       KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
       KIS_ACCOUNT: ${{ secrets.KIS_ACCOUNT }}
@@ -80,6 +81,11 @@ jobs:
         run: |
           pip install -q -r requirements.txt
           python -m playwright install --with-deps chromium
+
+      - name: Gemini 연결 (LiteLLM 프록시)
+        run: |
+          uv tool install -q 'litellm[proxy]'
+          cd prism && python ../scripts/report/gemini_proxy.py
 
       - name: 설정 파일 만들기
         working-directory: prism

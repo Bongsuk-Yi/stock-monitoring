@@ -17,7 +17,8 @@
 ## AI 분석 리포트
 GitHub → Actions → **AI 리포트 요청** → Run workflow 에 종목 코드(예: 005930, NVDA)를 넣으면
 PRISM-INSIGHT 에이전트가 리포트를 만들어 사이트(판단 탭·목록 탭)에 암호화해 올립니다.
-- 필요한 Secret: `OPENAI_API_KEY` (선택: `PERPLEXITY_API_KEY` 또는 `TAVILY_API_KEY` 뉴스 검색, `FIRECRAWL_API_KEY`)
+- AI 모델: Google **Gemini** (LiteLLM 프록시로 PRISM 의 OpenAI 호출을 Gemini 로 연결). 기본은 쓸 수 있는 가장 높은 Pro 모델 자동 선택, 저장소 Variable `GEMINI_MODEL` 로 지정 가능
+- 필요한 Secret: `GEMINI_API_KEY` (선택: `PERPLEXITY_API_KEY` 또는 `TAVILY_API_KEY` 뉴스 검색, `FIRECRAWL_API_KEY`)
 - 한국 종목 시세는 **네이버 증권**(`scripts/report/naver_source.py`)으로 받습니다. KIS 키 3종(`KIS_APP_KEY`·`KIS_APP_SECRET`·`KIS_ACCOUNT`)을 넣으면 KIS를 씁니다.
 
 ## 동작 방식
