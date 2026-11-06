@@ -75,17 +75,17 @@ jobs:
           node-version: 22
       - uses: astral-sh/setup-uv@v6
 
-      - name: 설정 파일 만들기
-        working-directory: prism
-        run: |
-          pip install -q pyyaml
-          python ../scripts/report/configure.py ${{ steps.t.outputs.market }}
-
       - name: 의존성 설치
         working-directory: prism
         run: |
           pip install -q -r requirements.txt
           python -m playwright install --with-deps chromium
+
+      - name: 설정 파일 만들기
+        working-directory: prism
+        run: |
+          pip install -q pyyaml
+          python ../scripts/report/configure.py ${{ steps.t.outputs.market }}
 
       - name: AI 분석 (5~15분)
         working-directory: prism

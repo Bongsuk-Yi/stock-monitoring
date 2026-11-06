@@ -23,4 +23,10 @@ if _os.getenv("PRISM_NAVER_SOURCE") == "1":
         return {}
 '''
     km.write_text(k, encoding="utf-8")
+# 수급 요약 문구의 출처 표기를 네이버로
+fe = Path("prism_core/kr_flow_evidence.py")
+t = fe.read_text(encoding="utf-8")
+t = (t.replace('"source": "KIS"', '"source": "NAVER"').replace("원천: KIS", "원천: 네이버 증권").replace("출처: KIS", "출처: 네이버 증권")
+      .replace("KIS 시장지수의 관측 거래일", "네이버 증권 지수의 관측 거래일").replace("KIS_benchmark_observed_sessions", "NAVER_benchmark_observed_sessions"))
+fe.write_text(t, encoding="utf-8")
 print("naver source installed")
