@@ -1,0 +1,15 @@
+name: Probe
+on:
+  push:
+    paths: ['scripts/probe.mjs']
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: node scripts/probe.mjs
