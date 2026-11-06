@@ -56,6 +56,12 @@ jobs:
           git add store.enc.json && git commit -qm "data $(TZ=Asia/Seoul date '+%F %T')"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
 
+      - name: AI 리포트 가져오기 (reports 브랜치)
+        run: |
+          mkdir -p reports
+          if git fetch origin reports --depth=1; then git archive origin/reports | tar -x -C reports; fi
+          ls reports | head
+
       - run: node scripts/build.mjs store.enc.json
       - uses: actions/configure-pages@v5
         with:

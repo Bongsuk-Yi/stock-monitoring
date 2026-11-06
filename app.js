@@ -173,6 +173,7 @@ function rJudge() {
     ['참고 · 시장 국면', ptag(MP), MP ? `${s.market} 분산일 ${MP.dd}일 / 25거래일${MP.state === 'CORRECTION' && MP.rallyDay ? ` · 반등 ${MP.rallyDay}일째` : ''} · 판단에 반영하려면 ③ 설정을 켜세요` : '지수 자료 없음'],
   ].map(([a, b, c]) => `<div class="basis-row"><b>${a}</b>${b}<span>${c}</span></div>`).join('') + `<div class="basis-row"><b>종합 판단</b>${vtag(j.verdict)}<span>${esc(j.reason)}</span></div>`;
   rCfg();
+  rAiRep();
   const i = S.rec.d.length - 1, A = S.A;
   const sigDesc = ['세력 매집이 이어지는 중(매집 5일선>20일선, 분산비 0.8 이상)인데 가격은 직전 5일 고점보다 3% 이상 눌리고 20일선 근처 이상', '매집 간격이 과거 양(+) 간격의 상위 25% 선을 넘음', '최근 5일 안에 20일 평균의 2.5배 이상 거래 + 양봉 + 세력 순매수'];
   $('#sigTable').innerHTML = `<tr><th>신호</th><th>오늘</th><th>설명</th></tr>` + E.SIG_NAMES.map((n, k) => `<tr><td><b>${'①②③'[k]} ${n}</b></td><td>${s.sig[k] ? '<span class="pass">켜짐</span>' : '<span class="unk">꺼짐</span>'}</td><td class="note" style="margin:0">${sigDesc[k]}</td></tr>`).join('')
@@ -205,6 +206,65 @@ $('#cfgBox').addEventListener('change', (e) => {
   lsSet('sd.cfg', c); rejudge(); rHero(); rJudge(); $('#cfgBox').closest('details').open = true;
 });
 $('#cfgBox').addEventListener('click', (e) => { if (e.target.id === 'cfgReset') { S.cfg = JSON.parse(JSON.stringify(E.DEFAULT_CFG)); lsSet('sd.cfg', S.cfg); rejudge(); rHero(); rJudge(); $('#cfgBox').closest('details').open = true; toast('기본값으로 되돌렸습니다'); } });
+
+/* AI 리포트 */
+const REPO = 'Bongsuk-Yi/stock-monitoring';
+const RUN_URL = `https://github.com/${REPO}/actions/workflows/report.yml`;
+async function loadReports() {
+  if (S.reports) return S.reports;
+  try { S.reports = await load('reports/index.enc.json'); } catch (_) { S.reports = []; }
+  return S.reports;
+}
+async function loadBytes(url) {
+  const r = await fetch(url + '?v=' + Date.now(), { cache: 'no-cache' }); if (!r.ok) throw new Error('HTTP ' + r.status);
+  const env = await r.json();
+  let bytes = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(env.iv) }, await aesKey(env.salt, env.iterations), b64(env.data)));
+  if (env.compression === 'gzip') bytes = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+  return bytes;
+}
+const repRow = (x) => `<tr class="go" data-rep="${x.id}"><td><span class="nm"><b>${esc(x.name)}</b><span>${x.code}</span></span></td><td class="note">${x.market} · ${x.lang === 'en' ? '영어' : '한국어'}</td><td class="r">${ymd(x.date)}</td><td class="r">${x.pdf ? 'PDF' : ''}</td></tr>`;
+function requestHTML(code) {
+  return `<div class="req-box"><b>새 리포트 요청</b> (GitHub Actions로 5~15분, OpenAI 이용료 발생)
+    <ol><li><a href="${RUN_URL}" target="_blank" rel="noopener">요청 페이지 열기 ↗</a> (GitHub 로그인 필요, 휴대폰은 GitHub 앱에서도 됩니다)</li>
+    <li>오른쪽 <b>Run workflow</b>를 누르고 종목 코드에 ${code ? `<span class="code-chip" data-copy="${code}" title="눌러서 복사">${code}</span>` : '코드(예: 005930, NVDA)'} 를 넣은 뒤 초록 <b>Run workflow</b></li>
+    <li>끝나면 이 화면에 자동으로 올라옵니다(새로고침)</li></ol></div>`;
+}
+async function rAiRep() {
+  const box = $('#aiRepBox'); if (!box || !S.code) return;
+  const list = (await loadReports()).filter((x) => x.code === S.code);
+  box.innerHTML = (list.length ? `<table class="tbl">${list.map(repRow).join('')}</table>` : '<p class="note">아직 이 종목의 AI 리포트가 없습니다.</p>') + requestHTML(S.code)
+    + '<p class="note">PRISM-INSIGHT의 AI 에이전트들이 기술적 분석·수급·기업 현황·기업 개요·뉴스·시장 분석과 투자 전략을 씁니다. 참고 자료이며 투자 권유가 아닙니다.</p>';
+}
+async function rRepList() {
+  const box = $('#repList'); if (!box) return;
+  const list = await loadReports();
+  box.innerHTML = (list.length ? `<table class="tbl"><tr><th>종목</th><th>시장 · 언어</th><th class="r">작성일</th><th></th></tr>${list.map(repRow).join('')}</table>` : '<p class="note">아직 만든 리포트가 없습니다.</p>') + requestHTML('');
+}
+let vPdfId = null;
+async function openReport(id) {
+  const x = (S.reports || []).find((r) => r.id === id); if (!x) return;
+  $('#viewer').hidden = false; $('#vTitle').textContent = `${x.name} (${x.code}) · ${ymd(x.date)}`; $('#vBody').innerHTML = '<p class="gate-msg">복호화 중…</p>';
+  vPdfId = x.pdf ? x.id : null; $('#vPdf').hidden = !x.pdf;
+  try {
+    const md = new TextDecoder().decode(await loadBytes(`reports/r/${id}.md.enc.json`));
+    const html = window.marked ? window.marked.parse(md) : `<pre>${esc(md)}</pre>`;
+    $('#vBody').innerHTML = window.DOMPurify ? window.DOMPurify.sanitize(html) : `<pre>${esc(md)}</pre>`;
+    $('#vBody').querySelectorAll('a').forEach((a) => { a.target = '_blank'; a.rel = 'noopener noreferrer'; });
+    $('#vBody').scrollTop = 0;
+  } catch (e) { $('#vBody').innerHTML = `<p class="gate-msg">리포트를 열지 못했습니다: ${esc(e.message)}</p>`; }
+}
+$('#vClose').addEventListener('click', () => ($('#viewer').hidden = true));
+$('#viewer').addEventListener('click', (e) => { if (e.target.id === 'viewer') $('#viewer').hidden = true; });
+$('#vPdf').addEventListener('click', async () => {
+  if (!vPdfId) return; const btn = $('#vPdf'); btn.disabled = true; btn.textContent = '준비 중…';
+  try { const b = await loadBytes(`reports/r/${vPdfId}.pdf.enc.json`); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([b], { type: 'application/pdf' })); a.download = vPdfId + '.pdf'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
+  catch (e) { toast('PDF를 받지 못했습니다'); }
+  btn.disabled = false; btn.textContent = 'PDF 받기';
+});
+document.addEventListener('click', (e) => {
+  const r = e.target.closest('[data-rep]'); if (r) { e.preventDefault(); e.stopPropagation(); openReport(r.dataset.rep); return; }
+  const c = e.target.closest('[data-copy]'); if (c) { navigator.clipboard?.writeText(c.dataset.copy).then(() => toast(`${c.dataset.copy} 복사했습니다`)); }
+}, true);
 
 /* 강한진입 */
 function rStreak() {
@@ -370,6 +430,7 @@ function rForce() {
 
 /* 목록 */
 function rList() {
+  rRepList();
   const sel = $('#qSector'); if (sel.options.length < 2) sel.innerHTML += [...new Set(S.sum.stocks.map((s) => s.sector).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko')).map((x) => `<option>${esc(x)}</option>`).join('');
   const q = $('#q').value, m = $('#qMarket').value, sc = sel.value;
   const res = S.sum.stocks.filter((s) => matchQ(s, q) && (!m || s.market === m) && (!sc || s.sector === sc));

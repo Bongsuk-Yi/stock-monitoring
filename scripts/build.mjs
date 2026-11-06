@@ -22,6 +22,8 @@ for (const f of ['index.html', 'styles.css', 'app.js', 'favicon.svg', 'manifest.
 cpSync(join(root, 'js'), join(dist, 'js'), { recursive: true, filter: (p) => !p.endsWith('package.json') });
 mkdirSync(join(dist, 'vendor'), { recursive: true });
 cpSync(join(root, 'node_modules/lightweight-charts/dist/lightweight-charts.standalone.production.js'), join(dist, 'vendor/lightweight-charts.js'));
+cpSync(join(root, 'node_modules/marked/lib/marked.umd.js'), join(dist, 'vendor/marked.js'));
+cpSync(join(root, 'node_modules/dompurify/dist/purify.min.js'), join(dist, 'vendor/purify.js'));
 
 /* ── 분석 ── */
 const store = existsSync(STORE) ? JSON.parse(decryptNode(JSON.parse(readFileSync(STORE, 'utf8')), pw)) : { stocks: {} };
@@ -91,6 +93,9 @@ for (const s of rows) s.cap = caps[s.code] ? Math.round(caps[s.code] / 1e8) : nu
 
 put('data/summary.json', { built: new Date().toISOString(), date: lastDate, n: rows.length, stocks: rows, market: mk, hist, sectors: secList, secDates, pulse, screen });
 writeFileSync(join(dist, 'data', 'key.json'), JSON.stringify({ salt: K.salt.toString('base64') }));
+
+/* ── AI 리포트(이미 암호화됨) 복사 ── */
+if (existsSync(join(root, 'reports', 'index.enc.json'))) { cpSync(join(root, 'reports'), join(dist, 'reports'), { recursive: true }); console.log('AI 리포트 포함'); }
 
 /* ── HTML 암호화 ── */
 const ver = Date.now().toString(36);
