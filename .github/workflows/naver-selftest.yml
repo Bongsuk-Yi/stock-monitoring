@@ -1,7 +1,7 @@
 name: naver-selftest
 on:
   push:
-    paths: ['.github/workflows/naver-selftest.yml', 'scripts/report/**']
+    paths: ['.github/workflows/naver-selftest.yml']
 permissions:
   contents: read
 jobs:
@@ -19,6 +19,9 @@ jobs:
       - working-directory: prism
         run: |
           pip install -q -r requirements.txt
-          python ../scripts/report/install_naver.py
-          tail -6 cores/market_data/__init__.py
-          PRISM_NAVER_SOURCE=1 python ../scripts/report/test_naver.py 005930
+          python ../scripts/report/configure.py KR
+          echo "--- MCP env:"; python -c "import yaml;print(yaml.safe_load(open('mcp_agent.config.yaml'))['mcp']['servers']['kospi_kosdaq'])"
+          echo "--- GITHUB_ENV:"; cat "$GITHUB_ENV" | grep NAVER
+          grep -c "원천: 네이버 증권" prism_core/kr_flow_evidence.py
+      - working-directory: prism
+        run: python ../scripts/report/test_naver.py 000660 2>&1 | grep -E "체인 기능|^\[|flow_evidence_public|chain:"
