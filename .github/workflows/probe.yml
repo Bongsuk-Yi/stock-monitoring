@@ -1,0 +1,12 @@
+name: probe-quant
+on:
+  push:
+    branches: [probe-quant]
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22 }
+      - run: node scripts/probe.mjs
